@@ -5,7 +5,15 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+  - Enter owner and pet info which includes pet name, breed, available time per day that the scheduler will be use as constrain
+  - Add and manage care tasks which includes create, edit, remove tasks such as feeding, walks, medications, or grooming. Each will have a duration and priority level
+  - Generate and view daily plan will use the scheduler to list out the daily schedule for a pet based on entered tasks and constrains.
 - What classes did you include, and what responsibilities did you assign to each?
+  - There are four classes that I include
+    - ```Owner```: pet's owner name, time availability and their request service 
+    - ```Pet```: holds pet info, list of task, manages adding, removing, and sorting
+    - ```Task```: represents the care activities (name, duration, priority), completion status
+    - ```Scheduler```: builds daily schedule based on pet's plan, sort by priority, fit tasks into available time, and delegates task completion
 
 **b. Design changes**
 
@@ -19,7 +27,9 @@
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+  - Fill here
 - How did you decide which constraints mattered most?
+  - Fill here
 
 **b. Tradeoffs**
 
