@@ -47,23 +47,87 @@ pip install -r requirements.txt
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
 
 ```
-========================================
-        TODAY'S SCHEDULE
-========================================
+====================================================
+        ADDED ORDER (as inserted)
+====================================================
+--- Buddy (Golden Retriever) ---
+  17:00  [    ] Playtime in yard           25 min  [low]
+  07:30  [done] Morning walk               30 min  [high]
+  12:15  [    ] Brush coat                 20 min  [medium]
+   9:00  [    ] Flea treatment             15 min  [high]
+  09:05  [    ] Give medicine              20 min  [high]
+  14:10  [    ] Evening feed               20 min  [medium]
+
+--- Whiskers (Tabby Cat) ---
+  14:00  [    ] Vet check-up               45 min  [medium]
+  08:00  [done] Litter box clean           10 min  [high]
+  10:30  [    ] Grooming session           20 min  [low]
+
+====================================================
+        SORTED BY START TIME
+====================================================
+--- Buddy (Golden Retriever) ---
+  07:30  [done] Morning walk               30 min  [high]
+   9:00  [    ] Flea treatment             15 min  [high]
+  09:05  [    ] Give medicine              20 min  [high]
+  12:15  [    ] Brush coat                 20 min  [medium]
+  14:10  [    ] Evening feed               20 min  [medium]
+  17:00  [    ] Playtime in yard           25 min  [low]
+
+--- Whiskers (Tabby Cat) ---
+  08:00  [done] Litter box clean           10 min  [high]
+  10:30  [    ] Grooming session           20 min  [low]
+  14:00  [    ] Vet check-up               45 min  [medium]
+
+====================================================
+        FILTERED: PENDING vs COMPLETED
+====================================================
+--- Buddy (Golden Retriever) ---
+  Pending:
+   9:00  [    ] Flea treatment             15 min  [high]
+  09:05  [    ] Give medicine              20 min  [high]
+  12:15  [    ] Brush coat                 20 min  [medium]
+  14:10  [    ] Evening feed               20 min  [medium]
+  17:00  [    ] Playtime in yard           25 min  [low]
+  Completed:
+  07:30  [done] Morning walk               30 min  [high]
+
+--- Whiskers (Tabby Cat) ---
+  Pending:
+  10:30  [    ] Grooming session           20 min  [low]
+  14:00  [    ] Vet check-up               45 min  [medium]
+  Completed:
+  08:00  [done] Litter box clean           10 min  [high]
+
+====================================================
+        TODAY'S SCHEDULE (fits available time)
+====================================================
 Owner : Alex  |  Available: 120 min
 
 --- Buddy (Golden Retriever) ---
-  [    ] Morning walk               30 min  [high]
-  [    ] Flea treatment             15 min  [high]
-  [    ] Brush coat                 20 min  [medium]
-  [    ] Playtime in yard           25 min  [low]
+   9:00  [    ] Flea treatment             15 min  [high]
+  09:05  [    ] Give medicine              20 min  [high]
+  12:15  [    ] Brush coat                 20 min  [medium]
+  14:10  [    ] Evening feed               20 min  [medium]
+  17:00  [    ] Playtime in yard           25 min  [low]
 
 --- Whiskers (Tabby Cat) ---
-  [    ] Litter box clean           10 min  [high]
-  [    ] Vet check-up               45 min  [medium]
-  [    ] Grooming session           20 min  [low]
+  14:00  [    ] Vet check-up               45 min  [medium]
+  10:30  [    ] Grooming session           20 min  [low]
 
-========================================
+====================================================
+        CONFLICT DETECTION
+====================================================
+--- Buddy ---
+  [CONFLICT] 'Flea treatment' (9:00-09:15) overlaps 'Give medicine' (09:05-09:25)
+
+--- Whiskers ---
+  No conflicts.
+
+--- Across pets (owner double-booked) ---
+  [CONFLICT] Whiskers's 'Vet check-up' (14:00-14:45) overlaps Buddy's 'Evening feed' (14:10-14:30)
+
+====================================================
 ```
 
 ## 🧪 Testing PawPal+
