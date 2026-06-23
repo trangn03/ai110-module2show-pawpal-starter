@@ -14,13 +14,12 @@
     - ```Pet```: holds pet info, list of task, manages adding, removing, and sorting
     - ```Task```: represents the care activities (name, duration, priority), completion status
     - ```Scheduler```: builds daily schedule based on pet's plan, sort by priority, fit tasks into available time, and delegates task completion
-  - I also added two supporting enumerations, ```Priority``` (high/medium/low) and ```Recurrence``` (none/daily/weekly), which the ```Task``` class uses.
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
-  - Yes, I added an enumeration class called ```Priority``` for the scheduler which determine what task should complete first. There are three level apply called high, medium, and low. 
+  - Yes, I added an two enumeration class called ```Priority``` for the scheduler which determine what task should complete first. There are three level apply called high, medium, and low. The other one is ```Recurrence``` which define if the task needs to repeat daily, weekly or none.
 
 ---
 
@@ -38,9 +37,9 @@
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
-  - My scheduler uses a greedy, priority-first approach. In ```fit_tasks_by_time``` I sort the pending tasks from high to low priority and then add each one only if it still fits in the remaining time. The implementation will choose the most important tasks, but can waste time or skip a better combination. For example, with 60 minutes available and tasks of 50 (high), 30 (medium), and 30 (medium) minutes, my scheduler picks the 50-minute high-priority task and leaves 10 minutes unused, even though the two 30-minute tasks together would have filled the whole hour. A true optimization (0/1 knapsack) would compare every combination, but I chose not to do that.
+  - My scheduler uses a greedy, priority-first approach. In ```fit_tasks_by_time``` I sort the pending tasks from high to low priority and then add each one only if it still fits in the remaining time. The implementation will choose the most important tasks, but can waste time or skip a better combination. For example, with 60 minutes available and tasks of 50 (high), 30 (medium), and 30 (medium) minutes, my scheduler picks the 50-minute high-priority task and leaves 10 minutes unused, even though the two 30-minute tasks together would have filled the whole hour. 
 - Why is that tradeoff reasonable for this scenario?
-  - This is a reasonable tradeoff because a pet owner cares more about *the important tasks getting done* than about squeezing every last minute out of the day. Medication and feeding should win the time slot over playtime, and greedy-by-priority guarantees that. 
+  - This is a reasonable tradeoff because a pet owner cares more about the important tasks getting done than about squeezing every last minute out of the day. Medication and feeding should win the time slot over playtime, and greedy-by-priority guarantees that. 
 
 ---
 
@@ -52,11 +51,11 @@
   - I used Claude AI across different phases for the project
     - Design brainstorming: I asked Claude for a list of small algorithm and logic improvements to make the scheduler more efficient (sorting by time, filtering by pet/status, recurring tasks, and conflict detection). It suggested concrete approaches like adding a start-time field, a single multi-key sort, and an interval-overlap check, which gave me a clear roadmap of features to build.
     - Debugging/Refactoring: Claude helped me refactor duplicated logic, such as pulling the "skip completed tasks" check into a reusable ```pending()``` method and routing task completion through one place. It also caught a Windows terminal crash where the ⚠️ emoji could not be encoded in cp1252, and fixed it by using a plain ```[CONFLICT]``` label for terminal output while keeping the emoji in the Streamlit UI.
-    - Documentation: I used Claude to write clear docstrings and comments explaining *why* the code works.
+    - Documentation: I used Claude to write clear docstrings and comments explaining why the code works.
     - UI enhancement: Claude helped me extend the Streamlit app with a start-time picker, a "show All/Pending/Completed" status filter, multi-pet support with a pet selector, a "Repeats" dropdown for recurring tasks, and warning messages for scheduling conflicts.
     - Testing: Claude verified each feature in the terminal by adding out-of-order and deliberately overlapping tasks to ```main.py```, running it, and checking the printed output. It also ran the existing pytest suite after every change to make sure nothing broke.
 - What kinds of prompts or questions were most helpful?
-  - The most helpful prompts were asking for *one feature at a time* ("start with sorting by time," then "move on to filtering") instead of everything at once, which kept each change small and easy to review. Conceptual "how does this work" questions (like how to use a lambda as a sort key for "HH:MM" strings) were also useful because they helped me understand the code rather than just copy it, so I could decide between storing the time as an integer or a string myself.
+  - The most helpful prompts were asking for one feature at a time ("start with sorting by time," then "move on to filtering") instead of everything at once, which kept each change small and easy to review. Conceptual "how does this work" questions (like how to use a lambda as a sort key for "HH:MM" strings) were also useful because they helped me understand the code rather than just copy it, so I could decide between storing the time as an integer or a string myself.
 
 **b. Judgment and verification**
 
@@ -83,7 +82,7 @@
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
-  - I am fairly confident in the core behavior. The full pytest suite (17 tests) passes, and it covers sorting, recurrence, conflict detection, the greedy time-fitting plan, multi-pet scheduling against a shared time budget, and state serialization round-trips. Writing tests also forced bugs to the surface and confirmed the fixes, which raised my confidence beyond just "it looked right when I ran it." 
+  - I am fairly confident in the core behavior. The pytest suite passes, and it covers sorting, recurrence, conflict detection, the greedy time-fitting plan, multi-pet scheduling against a shared time budget, and state serialization round-trips. Writing tests also find out where the bugs in the code and utilize Claude to confirm the fixes.
 - What edge cases would you test next if you had more time?
   - **Tasks crossing midnight** — a 23:00 task lasting two hours, since ```end_minutes``` can exceed 1440 and never wraps, so a late-night task may not overlap-check correctly against an early-morning one.
   - **Zero or negative duration**, and an ```available_minutes``` of 0 or negative, to confirm the planner degrades gracefully.
@@ -97,11 +96,14 @@
 **a. What went well**
 
 - What part of this project are you most satisfied with?
+  - The UML diagram helped me to think about class responsibilities before writing the code. The separation between ```pawpal_system.py``` and ```app.py``` make the logic more easier to build and test independently. I could run ```pytest``` and ```main.py``` to distinguish the file with logic and the file with UI. Every bug I found through the tests was fixable without touching the UI.
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
+  - I would replace the flat pawpal_data.json file with a proper database (SQLite would be a natural fit since it's built into Python). Right now all state is serialized into one JSON file on every save — adding a database would let me query tasks by date, status, or pet without loading everything into memory, and it would scale better as the task history grows.
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+  - The most important thing I learned is to ask AI one feature at a time and verify each change before moving on. Also I know when to push back the suggestion and ask the reason why the AI apply the changes to the code.  When I asked Claude to implement everything at once early on, the suggestions were harder to review and easier to accept without understanding. Asking "how does this lambda sort key work?" before using it meant I could catch the un-padded "9:00" edge case myself rather than discovering it as a bug later.
