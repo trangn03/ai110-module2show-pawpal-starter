@@ -1,12 +1,70 @@
+import json
 from datetime import time
+from pathlib import Path
 
 import streamlit as st
-from pawpal_system import Priority, Recurrence, Owner, Task, Pet, Scheduler, format_minutes
+from pawpal_system import (
+    Priority,
+    Recurrence,
+    Owner,
+    Task,
+    Pet,
+    Scheduler,
+    format_minutes,
+    tasks_overlap,
+    serialize_state,
+    deserialize_state,
+)
+
+# State is mirrored to this file so a browser refresh doesn't wipe the day.
+DATA_FILE = Path(__file__).parent / "pawpal_data.json"
 
 
 def t_end(task: Task) -> str:
     """End time of a task as an HH:MM string."""
     return format_minutes(task.end_minutes)
+
+
+def render_overflow_hint(skipped: list[Task], plan: list[Task]) -> None:
+    """Tell the user how much extra time would fit the time-skipped tasks.
+
+    Tasks skipped only because the budget ran out can be fixed by adding
+    minutes; tasks skipped because they overlap a scheduled task cannot — they
+    need rescheduling. The two are reported separately so the advice is honest.
+    """
+    time_skipped = [t for t in skipped if not any(tasks_overlap(t, p) for p in plan)]
+    conflict_skipped = [t for t in skipped if any(tasks_overlap(t, p) for p in plan)]
+    if time_skipped:
+        extra = sum(t.duration_minutes for t in time_skipped)
+        st.info(
+            f"⏱️ Add about **{extra} more minute(s)** to fit the "
+            f"{len(time_skipped)} task(s) skipped for time."
+        )
+    if conflict_skipped:
+        st.caption(
+            f"🔀 {len(conflict_skipped)} task(s) were skipped due to time "
+            "conflicts — adding minutes won't help; reschedule them instead."
+        )
+
+
+def load_state() -> None:
+    """Populate session_state from the data file, if it exists and is valid."""
+    if not DATA_FILE.exists():
+        return
+    try:
+        data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        owner, pets = deserialize_state(data)
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return  # corrupt/old file: start fresh rather than crash
+    if owner is not None:
+        st.session_state.owner = owner
+    st.session_state.pets = pets
+
+
+def save_state() -> None:
+    """Write the current owner + pets to the data file as JSON."""
+    data = serialize_state(st.session_state.get("owner"), st.session_state.pets)
+    DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -14,8 +72,40 @@ st.title("🐾 PawPal+")
 st.markdown("Plan your pets' day by adding tasks, then generate a schedule based on available time.")
 
 # pets is a name -> Pet registry so one owner can manage several pets.
+# On first load this session, restore any previously saved state from disk.
 if "pets" not in st.session_state:
-    st.session_state.pets = {}
+    load_state()
+    if "pets" not in st.session_state:
+        st.session_state.pets = {}
+
+# --- Save / load data (sidebar) ---
+with st.sidebar:
+    st.subheader("💾 Data")
+    st.caption("Your pets and tasks are saved automatically and survive a refresh.")
+
+    st.download_button(
+        "⬇️ Download backup",
+        data=json.dumps(
+            serialize_state(st.session_state.get("owner"), st.session_state.pets),
+            indent=2,
+        ),
+        file_name="pawpal_data.json",
+        mime="application/json",
+    )
+
+    uploaded = st.file_uploader("⬆️ Restore from backup", type="json")
+    if uploaded is not None:
+        try:
+            owner, pets = deserialize_state(json.loads(uploaded.getvalue()))
+        except (json.JSONDecodeError, KeyError, ValueError):
+            st.error("That file isn't a valid PawPal+ backup.")
+        else:
+            if owner is not None:
+                st.session_state.owner = owner
+            st.session_state.pets = pets
+            save_state()
+            st.success("Backup restored.")
+            st.rerun()
 
 st.divider()
 
@@ -149,11 +239,56 @@ st.divider()
 # --- Schedule generation ---
 st.subheader("Generate Schedule")
 
+# Scope lets the owner plan one pet's day or share the time budget across all
+# pets (a single timeline where the owner can't attend two pets at once).
+scope = st.radio(
+    "Plan for",
+    ["Selected pet", "All pets (shared time)"],
+    horizontal=True,
+    disabled=len(st.session_state.pets) < 2,
+)
+
 if st.button("Generate schedule"):
     if "owner" not in st.session_state:
         st.warning("Save your owner info first.")
     elif not st.session_state.pets:
         st.warning("Add a pet first.")
+    elif scope == "All pets (shared time)":
+        owner = st.session_state.owner
+        pets = list(st.session_state.pets.values())
+        plan = Scheduler.generate_owner_plan(pets, owner)
+
+        if not plan:
+            st.warning("No tasks fit within the available time. Try adding shorter tasks or increasing available time.")
+        else:
+            st.success(f"Schedule across all pets — {owner.name} has {owner.available_minutes} min available.")
+            total = 0
+            for i, (p, task) in enumerate(plan, start=1):
+                total += task.duration_minutes
+                st.markdown(
+                    f"**{i}. {task.start_time} · {p.name} — {task.title}** — "
+                    f"{task.duration_minutes} min (priority: {task.priority.value})"
+                )
+            st.info(f"Total time scheduled: {total} min out of {owner.available_minutes} min available.")
+
+            chosen = {id(task) for _, task in plan}
+            chosen_tasks = [task for _, task in plan]
+            skipped = [
+                (p, t)
+                for p in pets
+                for t in p.pending()
+                if id(t) not in chosen
+            ]
+            if skipped:
+                st.markdown("**Skipped (no time left or conflicts with a scheduled task):**")
+                for p, t in skipped:
+                    reason = (
+                        "overlaps a scheduled task"
+                        if any(tasks_overlap(t, c) for c in chosen_tasks)
+                        else "did not fit remaining time"
+                    )
+                    st.markdown(f"- {p.name} — {t.title} ({t.duration_minutes} min) — {reason}")
+                render_overflow_hint([t for _, t in skipped], chosen_tasks)
     else:
         owner = st.session_state.owner
         pet = st.session_state.pets[selected_name]
@@ -178,6 +313,16 @@ if st.button("Generate schedule"):
 
                 skipped = [t for t in pet.tasks if t not in plan and not t.is_complete]
                 if skipped:
-                    st.markdown("**Skipped (did not fit):**")
+                    st.markdown("**Skipped (no time left or conflicts with a scheduled task):**")
                     for t in skipped:
-                        st.markdown(f"- {t.title} ({t.duration_minutes} min)")
+                        reason = (
+                            "overlaps a scheduled task"
+                            if any(tasks_overlap(t, p) for p in plan)
+                            else "did not fit remaining time"
+                        )
+                        st.markdown(f"- {t.title} ({t.duration_minutes} min) — {reason}")
+                    render_overflow_hint(skipped, plan)
+
+# Streamlit reruns this script top-to-bottom on every interaction, so saving
+# here persists whatever the user just changed (added/completed/cleared tasks).
+save_state()

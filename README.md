@@ -136,6 +136,9 @@ Owner : Alex  |  Available: 120 min
 # Run the full test suite:
 python -m pytest
 
+# Individual test names:
+python -m pytest -v
+
 # Run with coverage:
 pytest --cov
 ```
